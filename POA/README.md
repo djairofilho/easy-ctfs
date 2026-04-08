@@ -1,73 +1,81 @@
-# POA - Padding Oracle Attack (CTF)
+# POA - Padding Oracle / CBC Bit-Flipping (CTF)
 
-Desafio de CTF em Flask com cookie AES-CBC vulneravel a bit-flipping/padding oracle para obter privilegio de admin e revelar a flag.
+Desafio web em Flask com autenticacao por cookie AES-CBC vulneravel, permitindo elevar privilegio de `guest` para `admin` e capturar a flag.
 
-## Estrutura
+## Objetivo do desafio
 
-- `app.py`: aplicacao Flask do desafio
-- `Dockerfile`: imagem para deploy (porta `8080`)
-- `solution.py`: script de exploracao do desafio
-- `.gitignore`: regras de arquivos locais
-- `CONTRIBUTING.md`: padrao de commits (`feat`, `fix`, `chore`)
+Explorar o cookie `auth` para alterar o plaintext descriptografado sem conhecer a chave, usando manipulacao de bits no IV (e comportamento de erro de padding como sinal auxiliar).
 
-## Como executar localmente
+## Arquivos
 
-1. Instale dependencias Python:
+- `app.py`: servico vulneravel
+- `solution.py`: exploit de referencia
+- `Dockerfile`: empacotamento para deploy
+- `.gitignore`: regras locais de Python/editor
+- `CONTRIBUTING.md`: convencoes de commit deste CTF
+
+## Vulnerabilidade resumida
+
+- O app cifra o cookie com AES-CBC.
+- O primeiro bloco de plaintext e previsivel: `user:guest|info:`.
+- Em CBC, alterar bytes do IV altera bytes do primeiro bloco apos decrypt.
+- Com bit-flipping no IV, o atacante forja `user:admin|info:` sem conhecer a chave.
+
+## Setup local
+
+1. Instale dependencias:
 
 ```bash
 pip install flask pycryptodome requests
 ```
 
-2. Rode a aplicacao:
+2. Execute o servidor:
 
 ```bash
 python app.py
 ```
 
-3. Acesse no navegador:
+3. Acesse:
 
 ```text
 http://localhost:8080/
 ```
 
-Por padrao local, a flag fallback e `flag{teste_local_123}` se a variavel `FLAG` nao estiver definida.
+Variaveis importantes:
 
-## Executar com Docker
+- `FLAG`: flag retornada para admin
+- fallback local: `flag{teste_local_123}`
 
-Build da imagem:
+## Execucao com Docker
+
+Build:
 
 ```bash
 docker build -t poa:latest .
 ```
 
-Rodar local:
+Run:
 
 ```bash
 docker run --rm -p 8080:8080 -e FLAG="flag{teste_docker}" poa:latest
 ```
 
-## Publicacao no Docker Hub
+## Deploy em plataforma CTF (ex.: GZCTF)
 
-Exemplo com o repositorio `djairodsf/poa-ctf`:
+- Imagem: `djairodsf/poa-ctf:latest`
+- Porta exposta: `8080`
+- Flag: configurada no campo da plataforma
 
-```bash
-docker tag poa:latest djairodsf/poa-ctf:latest
-docker push djairodsf/poa-ctf:latest
-```
+O servico ja le a flag por variavel de ambiente `FLAG`.
 
-## Uso no GZCTF
+## Solucao de referencia
 
-No desafio dinamico/container:
+O `solution.py` executa:
 
-- Image: `djairodsf/poa-ctf:latest`
-- Porta do servico: `8080`
-- Flag: preencher no campo de flag do proprio GZCTF
-
-O app ja le a flag por variavel de ambiente `FLAG`.
-
-## Solucao (exploit)
-
-O arquivo `solution.py` demonstra um ataque de bit-flip no IV do cookie `auth` para transformar `user:guest` em `user:admin` e obter a flag.
+1. Requisita `/` para obter cookie `auth` legitimo.
+2. Separa `IV | C1 | C2...`.
+3. Aplica XOR no IV para transformar `user:guest|info:` em `user:admin|info:`.
+4. Reenvia cookie forjado e le resposta com a flag.
 
 Execucao:
 
@@ -75,4 +83,14 @@ Execucao:
 python solution.py
 ```
 
-> Ajuste a constante `URL` em `solution.py` para a instancia alvo.
+Antes de rodar, ajuste a constante `URL` no arquivo `solution.py` para a instancia alvo.
+
+## Troubleshooting rapido
+
+- `500 Padding Error`: cookie invalido ou bytes alterados incorretamente.
+- `400 Erro interno`: formato do cookie nao esperado.
+- Sem flag na resposta: forja nao gerou substring `admin` no plaintext final.
+
+## Aviso etico
+
+Use este material apenas em ambiente controlado de ensino/CTF autorizado.
